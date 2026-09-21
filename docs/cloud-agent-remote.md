@@ -49,8 +49,8 @@ credentials.
 ./scripts/netem.sh status
 ```
 
-`apply` / `clear` need root. If you apply on this VM, use `--dst` (do not shape
-all egress) and a short `--ttl`, then clear — do not leave netem enabled:
+`apply` / `clear` need root. If you apply, use `--dst` (do not shape all egress)
+and a short `--ttl`, then clear — do not leave netem enabled:
 
 ```bash
 sudo ./scripts/netem.sh apply --dst 203.0.113.10/32 --delay 200ms --jitter 20ms --ttl 30
@@ -59,6 +59,19 @@ sudo ./scripts/netem.sh clear
 ```
 
 `apply` defaults to a 600s auto-clear (`--ttl 0` to disable).
+
+### Kernel limitation: no `sch_netem` on this image
+
+On Cursor cloud-agent kernel `6.12.94+` (Sept 2026 check): `iproute2` installs and
+`./scripts/netem.sh status` works, but `apply` fails with
+`Specified qdisc kind is unknown` for `netem` and `prio`. The pod has no
+`/lib/modules` and no `modprobe`; only basic FIFO qdiscs (`pfifo` / `bfifo`)
+are accepted. There is nothing to load — simulated 200 ms RTT **cannot** be
+applied on this VM until the environment kernel includes `CONFIG_NET_SCH_NETEM`
+(and `CONFIG_NET_SCH_PRIO` for `--dst` filters).
+
+Until that exists, do the 200 ms attach on a hop whose kernel has netem
+(self-hosted worker, a Linux VM you control, or `tc` on the remote/middlebox).
 
 ## Apply latency (real remote)
 
@@ -112,10 +125,19 @@ sudo ./scripts/netem.sh clear
 
 ## Next step after this dry-run
 
-Provide an SSH identity and host (for example deb1: `Host` alias, hostname,
-user, and a key the cloud agent may use). Then:
+Two things are still required for a real `--remote` attach under 200 ms:
 
-1. `ssh <host>` (accept host key if needed).
-2. Destination-scoped netem at `delay 200ms 20ms` toward that host’s IP.
-3. `HERDR_REMOTE_TIMING=1 herdr --remote <host>` from the desktop terminal.
-4. `sudo ./scripts/netem.sh clear`.
+1. **SSH to a herdr server** (e.g. deb1): `Host` alias, hostname, user, and a
+   key this VM may use. None of that is on the image; do not invent credentials.
+   Confirm with `ssh <host>` before `herdr --remote`.
+2. **A netem-capable kernel** on the shaped hop. This cloud-agent kernel cannot
+   install `netem`. Use a self-hosted worker / Linux VM with netem, or run
+   `./scripts/netem.sh apply --dst …` on a host that can, then attach from the
+   desktop (`DISPLAY=:1`) with:
+
+   ```bash
+   HERDR_REMOTE_TIMING=1 herdr --remote <host>
+   ```
+
+   Clear qdiscs when done. `HERDR_REMOTE_TIMING` / `HERDR_ECHO_TIMING` come from
+   the IV-0002 harness; official `herdr` 0.9.1 still accepts `--remote`.

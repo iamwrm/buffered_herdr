@@ -2,6 +2,8 @@
 
 Copied from [herdr-windows-remote IV-0002](https://github.com/iamwrm/herdr-windows-remote/blob/master/docs/IV-0002-latency-improvements.md) for cloud-agent runs.
 
+These `netem.sh apply` scenarios need kernel `sch_netem` (and `sch_prio` when using `--dst`). The stock Cursor cloud-agent kernel does not provide them — see [cloud-agent-remote.md](cloud-agent-remote.md).
+
 | Scenario | `netem.sh` args |
 |---|---|
 | Asia↔US baseline | `--delay 200ms --jitter 20ms` |

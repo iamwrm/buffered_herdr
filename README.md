@@ -22,9 +22,10 @@ sudo apt-get update && sudo apt-get install -y iproute2
 curl -fsSL https://herdr.dev/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 herdr --version
-./scripts/netem.sh status   # no sudo
+./scripts/netem.sh status   # no sudo; apply needs sch_netem (see docs)
 
-# After SSH to a real remote exists (do not invent keys):
+# After SSH to a real remote exists (do not invent keys) *and* the hop
+# can install netem (this cloud-agent kernel currently cannot):
 REMOTE_IP=$(getent ahostsv4 your.remote.host | awk '{print $1; exit}')
 sudo ./scripts/netem.sh apply --dst "${REMOTE_IP}/32" --delay 200ms --jitter 20ms
 HERDR_REMOTE_TIMING=1 herdr --remote user@host
@@ -50,3 +51,5 @@ Default netem matrix (from IV-0002):
 ## Safety
 
 Shaping the wrong interface or destination can lock you out of SSH. Prefer matching a **destination IP** (`--dst`), and use the built-in auto-clear timer (`--ttl`) on first runs.
+
+Cursor cloud-agent kernels may lack `sch_netem` (`qdisc kind is unknown`). `status` still works; delay shaping needs a kernel with netem — see [docs/cloud-agent-remote.md](docs/cloud-agent-remote.md).
