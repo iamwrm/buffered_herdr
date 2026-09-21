@@ -14,13 +14,21 @@ Related prior art: [iamwrm/herdr-windows-remote](https://github.com/iamwrm/herdr
 
 ## Quick start (cloud agent VM)
 
+`tc`/`ip` and `herdr` are **not** on the stock Cursor cloud-agent image. See
+[docs/cloud-agent-remote.md](docs/cloud-agent-remote.md) for the full runbook.
+
 ```bash
-# 1) Install herdr (official Linux binary) if missing — see docs/cloud-agent-remote.md
-# 2) Apply simulated latency toward a peer IP (or whole default route — careful)
-sudo ./scripts/netem.sh apply --delay 200ms --jitter 20ms
-# 3) In another pane / after SSH target is ready:
+sudo apt-get update && sudo apt-get install -y iproute2
+curl -fsSL https://herdr.dev/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+herdr --version
+./scripts/netem.sh status   # no sudo; apply needs sch_netem (see docs)
+
+# After SSH to a real remote exists (do not invent keys) *and* the hop
+# can install netem (this cloud-agent kernel currently cannot):
+REMOTE_IP=$(getent ahostsv4 your.remote.host | awk '{print $1; exit}')
+sudo ./scripts/netem.sh apply --dst "${REMOTE_IP}/32" --delay 200ms --jitter 20ms
 HERDR_REMOTE_TIMING=1 herdr --remote user@host
-# 4) Cleanup
 sudo ./scripts/netem.sh clear
 ```
 
@@ -43,3 +51,5 @@ Default netem matrix (from IV-0002):
 ## Safety
 
 Shaping the wrong interface or destination can lock you out of SSH. Prefer matching a **destination IP** (`--dst`), and use the built-in auto-clear timer (`--ttl`) on first runs.
+
+Cursor cloud-agent kernels may lack `sch_netem` (`qdisc kind is unknown`). `status` still works; delay shaping needs a kernel with netem — see [docs/cloud-agent-remote.md](docs/cloud-agent-remote.md).
